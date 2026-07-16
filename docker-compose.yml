@@ -1,0 +1,14 @@
+services:
+  whatsapp:
+    build: .
+    container_name: whatsapp-mcp
+    ports:
+      - "8080:8080"
+    volumes:
+      - whatsapp-store:/app/whatsapp-bridge/store
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+volumes:
+  whatsapp-store:
