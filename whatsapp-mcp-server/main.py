@@ -1,5 +1,7 @@
+import os
 from typing import List, Dict, Any, Optional
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 from whatsapp import (
     search_contacts as whatsapp_search_contacts,
     list_messages as whatsapp_list_messages,
@@ -15,8 +17,23 @@ from whatsapp import (
     download_media as whatsapp_download_media
 )
 
-# Initialize FastMCP server
-mcp = FastMCP("whatsapp")
+# Initialize FastMCP server as a long-lived HTTP service instead of a
+# per-connection stdio process (see README / commit history: `docker exec -i`
+# per client used to leak orphaned stdio processes that accumulated until the
+# host OOM'd). stateless_http + json_response are intentional: none of the
+# tools below use server->client notifications or sampling, so there is no
+# need for the SSE/session-table machinery that stateful mode keeps open per
+# client - removing it removes the entire class of per-client state buildup.
+mcp = FastMCP(
+    "whatsapp",
+    host=os.environ.get("MCP_HOST", "0.0.0.0"),
+    port=int(os.environ.get("MCP_PORT", "8081")),
+    stateless_http=True,
+    json_response=True,
+    transport_security=TransportSecuritySettings(
+        allowed_hosts=["127.0.0.1:*", "localhost:*"]
+    ),
+)
 
 @mcp.tool()
 def search_contacts(query: str) -> List[Dict[str, Any]]:
@@ -247,5 +264,5 @@ def download_media(message_id: str, chat_jid: str) -> Dict[str, Any]:
         }
 
 if __name__ == "__main__":
-    # Initialize and run the server
-    mcp.run(transport='stdio')
+    # Initialize and run the server as a long-lived streamable-http service.
+    mcp.run(transport="streamable-http")
