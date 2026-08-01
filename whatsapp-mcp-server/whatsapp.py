@@ -257,7 +257,7 @@ def list_messages(
     include_context: bool = True,
     context_before: int = 1,
     context_after: int = 1
-) -> List[Message]:
+) -> str:
     """Get messages matching the specified criteria with optional context."""
     try:
         conn = sqlite3.connect(MESSAGES_DB_PATH, timeout=SQLITE_TIMEOUT)
@@ -353,7 +353,7 @@ def list_messages(
         
     except sqlite3.Error as e:
         print(f"Database error: {e}")
-        return []
+        return ""
     finally:
         if 'conn' in locals():
             conn.close()
