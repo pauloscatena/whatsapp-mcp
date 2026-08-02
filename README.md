@@ -90,6 +90,37 @@ A few properties are load-bearing and should not be casually changed:
 
 5. **Connect your MCP client** — see [Connecting a client](#connecting-a-client) below.
 
+### Rebuilding a single service
+
+To rebuild just the MCP server after a code change, without touching the bridge:
+
+```bash
+docker compose up -d --build --no-deps whatsapp-mcp
+```
+
+Both flags are load-bearing:
+
+- `--build` rebuilds the changed image.
+- `--no-deps` stops Compose from pulling `whatsapp-bridge` into scope through `depends_on`. Without it, `up -d --build whatsapp-mcp` builds, recreates and restarts the bridge too, even though the command names only one service.
+
+The two services also build to different image tags on purpose — `whatsapp-mcp:latest` for the bridge, `whatsapp-mcp-server:latest` for the MCP server. A shared tag meant that rebuilding either service re-pointed the tag the other resolved through, so a later routine `docker compose up -d` would recreate the bridge. The distinct tags and `--no-deps` fix two different halves of the same problem — both are needed.
+
+`--no-deps` also means Compose will not wait for the bridge's `service_healthy` condition. If the bridge happens to be unhealthy or reconnecting at that moment, the new MCP container starts anyway and may crash-loop until the bridge recovers. Confirm the bridge is healthy with `docker compose ps` before running the scoped rebuild.
+
+Because the two tags are built from the same Dockerfile, they share an image ID until the first time only one of them is rebuilt. After a scoped MCP rebuild the tags diverge and the host stores two full images (roughly 700 MB each) instead of one. The previously-tagged image becomes dangling and can be reclaimed with `docker image prune` (no `-a`), which only removes untagged images and never touches the tags still referenced by the running containers.
+
+> **Warning:** a full-stack `docker compose up -d --build` rebuilds and recreates `whatsapp-bridge` too. Since the bridge holds the authenticated WhatsApp session, that carries a risk of needing a fresh QR-code login. The session normally survives because the `whatsapp-store` volume persists it, but that isn't guaranteed. Full-stack rebuild is the right call for a first install (it's what step 3 above uses) and for changes that actually touch the bridge — it should not be the routine path for MCP-server-only changes.
+
+To rebuild the bridge itself, the equivalent scoped command is:
+
+```bash
+docker compose up -d --build --no-deps whatsapp-bridge
+```
+
+This one **will** recreate the bridge container by design, so expect the session-restore path — watch `docker compose logs -f whatsapp-bridge` for a QR prompt.
+
+`docker compose down` on its own preserves the `whatsapp-store` volume, but it still stops both services including the bridge, so it's not the right tool for a routine update — prefer the scoped `--no-deps` commands above. Never run `docker compose down -v` (or `docker volume rm whatsapp-store`): that deletes the volume, irreversibly destroying `messages.db` and the authenticated WhatsApp session.
+
 ### Running without containers
 
 The bridge and the MCP server can still run as two local processes instead of containers.

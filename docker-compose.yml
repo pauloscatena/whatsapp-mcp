@@ -1,6 +1,15 @@
 services:
   whatsapp-bridge:
     build: .
+    # This tag stays `whatsapp-mcp:latest` on purpose - do not "tidy up"
+    # this to match the service name. `whatsapp-mcp` below deliberately
+    # builds to a DIFFERENT tag (`whatsapp-mcp-server:latest`) so that
+    # rebuilding one service never re-points the tag the other resolves
+    # through. Renaming this tag would change this service's Compose
+    # config hash, which recreates the bridge container once - and the
+    # bridge holds the authenticated WhatsApp session, so that
+    # recreation risks a QR re-login. Both services still share
+    # `build: .` and the same Dockerfile; only the resulting tag differs.
     image: whatsapp-mcp:latest
     container_name: whatsapp-bridge
     command: ["bridge"]
@@ -57,7 +66,9 @@ services:
 
   whatsapp-mcp:
     build: .
-    image: whatsapp-mcp:latest
+    # Deliberately a distinct tag from the bridge's `image:` above - see
+    # the comment there for why.
+    image: whatsapp-mcp-server:latest
     container_name: whatsapp-mcp
     command: ["mcp"]
     depends_on:
