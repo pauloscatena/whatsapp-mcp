@@ -303,7 +303,9 @@ cd whatsapp-mcp-server
 uv run pytest
 ```
 
-This runs the suite in `whatsapp-mcp-server/tests/` — 31 tests covering config/env handling, the FastMCP transport setup (stateless streamable-http, host/port env vars, allowed hosts), the audio tmp-dir logic, and the SQLite query helpers in `whatsapp.py`.
+This runs the suite in `whatsapp-mcp-server/tests/` — 56 passed, 2 xfailed (58 tests collected) — covering config/env handling, the FastMCP transport setup (stateless streamable-http, host/port env vars, allowed hosts), the audio tmp-dir logic, the SQLite query helpers in `whatsapp.py`, and `list_chats` behavior: the `include_last_message` flag (both values, `query` filtering by name/jid, `last_active`/`name` ordering, pagination, and LEFT JOIN semantics so chats with no messages still appear), plus edge cases like a NULL `last_message_time`, a negative `page`, and `limit=0`.
+
+The 2 `xfailed` are pre-existing, known bugs pinned with `xfail(strict=True)` on purpose: (1) chats can be duplicated when two messages in the same chat share a timestamp, since the LEFT JOIN matches on timestamp equality at second resolution, and (2) the `query` filter doesn't escape the LIKE metacharacters `%` and `_`. Being `strict`, these tests fail loudly if the underlying bug is ever fixed without updating the test — that's intentional, not a broken test.
 
 ### Go (`whatsapp-bridge`)
 
